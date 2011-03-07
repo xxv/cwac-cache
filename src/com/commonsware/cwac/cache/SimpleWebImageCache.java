@@ -14,32 +14,25 @@
 
 package com.commonsware.cwac.cache;
 
-import android.app.Activity;
-import android.content.Intent;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
-import android.net.Uri;
-import android.os.Bundle;
-import android.util.Log;
-import android.widget.ImageView;
 import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.StringReader;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.MessageDigest;
+
+import android.R.dimen;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.graphics.BitmapFactory.Options;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.util.Log;
+
 import com.commonsware.cwac.bus.AbstractBus;
 import com.commonsware.cwac.task.AsyncTaskEx;
 
@@ -48,6 +41,9 @@ public class SimpleWebImageCache<B extends AbstractBus, M>
 	private static final String TAG="SimpleWebImageCache";
 	private B bus=null;
 	
+	private int mMaxWidth, mMaxHeight;
+	private boolean mScale = false;
+
 	static public File buildCachedImagePath(File cacheRoot, String url)
 		throws Exception {
 		return(new File(cacheRoot, md5(url)));
@@ -127,6 +123,53 @@ public class SimpleWebImageCache<B extends AbstractBus, M>
 		return(bus);
 	}
 	
+	/**
+	 * Set the maximum allowed size for images in the cache and 
+	 * enables image scaling. 
+	 * 
+	 * Scaling preserves aspect ratio.
+	 * 
+	 * @param width maximum width
+	 * @param height maximum height
+	 * @see setScaleImage()
+	 */
+	public void setMaxSize(int width, int height){
+		mMaxWidth = width;
+		mMaxHeight = height;
+		mScale = true;
+	}
+	
+	/**
+	 * sets whether or not the image gets scaled.
+	 * 
+	 * @param scaleImages true if you want the images to be scaled.
+	 */
+	public void setScaleImage(boolean scaleImages){
+		mScale = scaleImages;
+	}
+	
+	/**
+	 * Scale a bitmap, preserving its aspect ratio.
+	 * 
+	 * @param bmap
+	 * @return
+	 */
+	private Bitmap scaleBitmapPreserveAspect(Bitmap bmap){
+        	if (bmap == null){
+        		return null;
+        	}
+        	
+        	int origWidth = bmap.getWidth();
+        	int origHeight = bmap.getHeight();
+        	float scaleWidth = (float)mMaxWidth / origWidth;
+        	float scaleHeight = (float)mMaxHeight / origHeight;
+        	float scale = Math.min(scaleWidth, scaleHeight);
+        	
+    		bmap = Bitmap.createScaledBitmap(bmap, (int)((float)origWidth * scale), (int)((float)origHeight * scale), true);
+        
+    		return bmap;
+	}
+	
 	class FetchImageTask
 		extends AsyncTaskEx<Object, Void, Void> {
 		@Override
@@ -151,7 +194,14 @@ public class SimpleWebImageCache<B extends AbstractBus, M>
 				
 				byte[] raw=out.toByteArray();
 				
-				put(url, new BitmapDrawable(new ByteArrayInputStream(raw)));
+                Options opts = new Options();
+                opts.inPurgeable = true;
+                Bitmap bmap = BitmapFactory.decodeStream(new ByteArrayInputStream(raw), null, opts);
+                if (mScale){
+                	bmap = scaleBitmapPreserveAspect(bmap);
+                }
+
+				put(url, new BitmapDrawable(bmap));
 				
 				M message=(M)params[0];
 				
@@ -174,7 +224,7 @@ public class SimpleWebImageCache<B extends AbstractBus, M>
 			return(null);
 		}
 	}
-	
+
 	class LoadImageTask extends AsyncTaskEx<Object, Void, Void> {
 		@Override
 		protected Void doInBackground(Object... params) {
@@ -182,7 +232,13 @@ public class SimpleWebImageCache<B extends AbstractBus, M>
 			File cache=(File)params[2];
 			
 			try {
-				put(url, new BitmapDrawable(cache.getAbsolutePath()));
+                Options opts = new Options();
+                opts.inPurgeable = true;
+                Bitmap b = BitmapFactory.decodeFile(cache.getAbsolutePath(), opts);
+                if (mScale){
+                	b = scaleBitmapPreserveAspect(b);
+                }
+				put(url, new BitmapDrawable(b));
 				
 //				M message=(M)params[0];
 				
