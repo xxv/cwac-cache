@@ -194,9 +194,7 @@ public class SimpleWebImageCache<B extends AbstractBus, M>
 				
 				byte[] raw=out.toByteArray();
 				
-                Options opts = new Options();
-                opts.inPurgeable = true;
-                Bitmap bmap = BitmapFactory.decodeStream(new ByteArrayInputStream(raw), null, opts);
+                Bitmap bmap = BitmapFactory.decodeStream(new ByteArrayInputStream(raw));
                 if (mScale){
                 	bmap = scaleBitmapPreserveAspect(bmap);
                 }
@@ -232,13 +230,11 @@ public class SimpleWebImageCache<B extends AbstractBus, M>
 			File cache=(File)params[2];
 			
 			try {
-                Options opts = new Options();
-                opts.inPurgeable = true;
-                Bitmap b = BitmapFactory.decodeFile(cache.getAbsolutePath(), opts);
+                Bitmap bmap = BitmapFactory.decodeFile(cache.getAbsolutePath());
                 if (mScale){
-                	b = scaleBitmapPreserveAspect(b);
+                	bmap = scaleBitmapPreserveAspect(bmap);
                 }
-				put(url, new BitmapDrawable(b));
+				put(url, new BitmapDrawable(bmap));
 				
 //				M message=(M)params[0];
 				
